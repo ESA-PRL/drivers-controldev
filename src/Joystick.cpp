@@ -18,7 +18,7 @@
 
 namespace controldev
 {
-Joystick::Joystick() : initialized(false), deadspot(false), deadspot_size(0)
+Joystick::Joystick() : initialized(false), deadzone_size_locomotion(0), deadzone_size_ptu(0)
 {
     axes = 0;
     buttons = 0;
@@ -143,9 +143,14 @@ bool Joystick::init(std::string const& dev)
 }
 
 
-void Joystick::setDeadspot(bool onOff, double size) {
-    deadspot = onOff;
-    deadspot_size = size;
+void Joystick::setDeadzoneSizeLocomotion(double size)
+{
+    deadzone_size_locomotion = size;
+}
+
+void Joystick::setDeadzoneSizePtu(double size)
+{
+    deadzone_size_ptu = size;
 }
 
 bool Joystick::updateState()
@@ -171,30 +176,18 @@ bool Joystick::updateState()
 
                 if(mybuffer[i].number == AXIS_Sideward || mybuffer[i].number == AXIS_Forward)
                 {
-                    if(deadspot)
-                    {
-                        if(abs(axes[mybuffer[i].number]) < deadspot_size * 32767)
-                        {
-                            axes[mybuffer[i].number] = 0;
-                        }
-                        else if(axes[mybuffer[i].number] > 0)
-                        {
-                            axes[mybuffer[i].number] = (axes[mybuffer[i].number] -
-                                    deadspot_size * 32767)
-                                / ((1.0-deadspot_size) * 32767.0) * 32767.0;
-                        }
-                        else if(axes[mybuffer[i].number] < 0)
-                        {
-                            axes[mybuffer[i].number] =
-                                (axes[mybuffer[i].number] +
-                                 deadspot_size * 32767)
-                                / ((1.0-deadspot_size) * 32767.0) * 32767.0;
-                        }
-                    }
-                    else
-                    {
-                        axes[mybuffer[i].number] = axes[mybuffer[i].number];
-                    }
+                    axes[mybuffer[i].number] = getAxisValueAfterDeadzone(axes[mybuffer[i].number], deadzone_size_locomotion);
+                    axes[mybuffer[i].number] = getAxisValueAfterDeadzone(axes[mybuffer[i].number], deadzone_size_locomotion);
+                }
+                else
+                {
+                    // This should cover the PTU.
+                    // mybuffer[i].number is null for these two axes, so we cannot compare as
+                    // follows:
+                    // if(mybuffer[i].number == AXIS_Pan || mybuffer[i].number == AXIS_Tilt)
+                    // Luckily these are the only two remaining axes.
+                    axes[mybuffer[i].number] = getAxisValueAfterDeadzone(axes[mybuffer[i].number], deadzone_size_ptu);
+                    axes[mybuffer[i].number] = getAxisValueAfterDeadzone(axes[mybuffer[i].number], deadzone_size_ptu);
                 }
                 if(mybuffer[i].number == 1 || mybuffer[i].number == 5)
                 {
@@ -217,6 +210,32 @@ bool Joystick::updateState()
 
     return false;
 
+}
+
+int Joystick::getAxisValueAfterDeadzone(const int raw_axis_value, const double deadzone_size) const
+{
+    if (deadzone_size == 0.0)
+    {
+        return raw_axis_value;
+    }
+
+    int axis_value = 0;
+    double imax = 32767.0; //TODO replace me by actual imax everywhere
+    if(abs(raw_axis_value) < deadzone_size * imax)
+    {
+        axis_value = 0;
+    }
+    else if(raw_axis_value > 0)
+    {
+        axis_value = (raw_axis_value - deadzone_size * imax)
+            / ((1.0 - deadzone_size) * imax) * imax;
+    }
+    else if(raw_axis_value < 0)
+    {
+        axis_value = (raw_axis_value + deadzone_size * imax)
+            / ((1.0 - deadzone_size) * imax) * imax;
+    }
+    return static_cast<int>(axis_value);
 }
 
 bool Joystick::getButtonPressed(int btn_nr) const

@@ -40,7 +40,8 @@ namespace controldev
 //
         virtual bool init(std::string const& dev);
 
-        void setDeadspot(bool onOff, double size);
+        void setDeadzoneSizeLocomotion(double size);
+        void setDeadzoneSizePtu(double size);
 
         virtual bool updateState();
 
@@ -81,8 +82,8 @@ namespace controldev
       private:
         int fd;
         bool initialized;
-        bool deadspot;
-        double deadspot_size;
+        double deadzone_size_locomotion;
+        double deadzone_size_ptu;
 
         int *axes;
         int *buttons;
@@ -93,6 +94,8 @@ namespace controldev
         std::vector<int> button_mapping;
         std::vector<std::string> axis_names;
         std::vector<std::string> button_names;
+
+        int getAxisValueAfterDeadzone(const int raw_axis_value, const double deadzone_size) const;
     };
 }
 #endif
